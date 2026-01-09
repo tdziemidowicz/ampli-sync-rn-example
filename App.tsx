@@ -107,7 +107,11 @@ const App = () => {
     setSyncInfo('Sending...');
     try {
       await syncSend(currentSession);
-      setSyncInfo('Sending: DONE');
+      setSyncInfo('Sending: DONE. Syncing...');
+      await syncPull(currentSession, progress => {
+        setSyncInfo(`Syncing: ${Math.ceil(progress * 100)}%`);
+      });
+      setSyncInfo('Syncing: DONE');
     } catch (e) {
       setSyncInfo(e instanceof Error ? e.message : String(e));
     } finally {
