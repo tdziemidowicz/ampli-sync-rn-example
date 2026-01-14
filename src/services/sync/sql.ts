@@ -5,7 +5,10 @@ import {
   pushChangesAPI,
 } from './api';
 import type { MigrationRow } from './api';
-import { buildBatchQueriesFromJsonRecords, countJsonRecords } from './formats/json';
+import {
+  buildBatchQueriesFromJsonRecords,
+  countJsonRecords,
+} from './formats/json';
 import { buildPushJsonRequestFromDb } from './formats/pushJson';
 import { dbAll, dbBatch, dbExec, type QueryLike } from '../db/database';
 
@@ -31,9 +34,7 @@ const convertDateTimeToUTCDateString = (value: unknown): string =>
 const convertDateTimeToUTCTimeString = (value: unknown): string =>
   new Date(value as any).toISOString().slice(11, 19);
 
-export const sendChangesQuery = async (
-  params: SyncParams
-): Promise<void> => {
+export const sendChangesQuery = async (params: SyncParams): Promise<void> => {
   const { request, recordsUpdated, recordsDeleted } =
     await buildPushJsonRequestFromDb(dbAll);
 
@@ -66,7 +67,7 @@ export const updateDatabaseQuery = async ({
   for (const { id, query } of data) {
     const time_start = new Date();
     try {
-      if (query.toLowerCase().startsWith('initialize table')) {
+      if (/^\s*initialize\s+table\b/i.test(query)) {
         throw new Error(
           `Unsupported migration query: ${query}. Backend should return full SQL migrations (JSON-only client).`,
         );
@@ -109,11 +110,9 @@ export const receiveChangesQuery = async (
   let firstError: unknown | null = null;
 
   const tablesArray = await dbAll<{ tbl_name: string }>(
-    "SELECT tbl_name FROM sqlite_master WHERE type='table' AND sql like '%RowId%' AND tbl_name!='MergeDelete'",
+    "SELECT tbl_name FROM sqlite_master WHERE type='table' AND sql like '%rowid%' AND tbl_name!='mergedelete'",
   );
-  const tableNames = tablesArray
-    .map(row => row.tbl_name)
-    .filter(Boolean);
+  const tableNames = tablesArray.map(row => row.tbl_name).filter(Boolean);
 
   for (let tableIndex = 0; tableIndex < tableNames.length; tableIndex++) {
     const tableName = tableNames[tableIndex];

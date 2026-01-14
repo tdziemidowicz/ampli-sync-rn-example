@@ -3,18 +3,6 @@ import type { PushJsonRequest } from './pushTypes';
 
 type DbAll = (query: QueryLike) => Promise<any[]>;
 
-const getValueCaseInsensitive = (source: any, key: string): unknown => {
-  if (!source || typeof source !== 'object') return undefined;
-  if (Object.prototype.hasOwnProperty.call(source, key)) return source[key];
-
-  const lower = key.toLowerCase();
-  for (const sourceKey of Object.keys(source)) {
-    if (sourceKey.toLowerCase() === lower) return source[sourceKey];
-  }
-
-  return undefined;
-};
-
 const toValue = (value: unknown): unknown => {
   if (value === null || typeof value === 'undefined') return 'null';
   if (
@@ -44,10 +32,8 @@ const opColumnNames = (sqlText: string): string[] => {
 const toRow = (source: any, columns: string[]): Record<string, unknown> => {
   const row: Record<string, unknown> = {};
   for (const columnName of columns) {
-    const lower = columnName.toLowerCase();
-    if (lower === 'mergeupdate') continue;
-    const outputKey = lower === 'rowid' ? 'rowid' : columnName;
-    row[outputKey] = toValue(getValueCaseInsensitive(source, columnName));
+    if (columnName === 'mergeupdate') continue;
+    row[columnName] = toValue(source?.[columnName]);
   }
   return row;
 };
@@ -63,10 +49,10 @@ export const buildPushJsonRequestFromDb = async (
   const recordsDeleted: QueryLike[] = [];
 
   const tablesArray = await dbAll(
-    "select tbl_name, sql from sqlite_master where type='table' and sql like '%RowId%'",
+    "select tbl_name, sql from sqlite_master where type='table' and sql like '%rowid%'",
   );
   const tables = tablesArray
-    .filter(({ tbl_name }) => tbl_name && tbl_name !== 'MergeDelete')
+    .filter(({ tbl_name }) => tbl_name && tbl_name !== 'mergedelete')
     .map(({ tbl_name, sql }) => ({ tableName: tbl_name, sql }));
 
   const changes: PushJsonRequest['changes'] = [];
@@ -76,18 +62,18 @@ export const buildPushJsonRequestFromDb = async (
     if (columns.length === 0) continue;
 
     const insertsSource = await dbAll(
-      `select * from ${tableName} where RowId is null`,
+      `select * from ${tableName} where rowid is null`,
     );
     const updatesSource = await dbAll(
-      `select * from ${tableName} where MergeUpdate > 0 and RowId is not null`,
+      `select * from ${tableName} where mergeupdate > 0 and rowid is not null`,
     );
 
     const inserts = insertsSource.map((row: any) => toRow(row, columns));
     const updates = updatesSource.map((row: any) => {
-      const rowIdValue = getValueCaseInsensitive(row, 'rowid');
-      const mergeUpdateValue = getValueCaseInsensitive(row, 'MergeUpdate');
+      const rowIdValue = row.rowid;
+      const mergeUpdateValue = row.mergeupdate;
       recordsUpdated.push({
-        sql: `UPDATE ${tableName} SET MergeUpdate=0 WHERE rowid=? AND MergeUpdate=?`,
+        sql: `UPDATE ${tableName} SET mergeupdate=0 WHERE rowid=? AND mergeupdate=?`,
         args: [String(rowIdValue), mergeUpdateValue],
       });
       return toRow(row, columns);
@@ -98,12 +84,12 @@ export const buildPushJsonRequestFromDb = async (
     }
   }
 
-  const deletesSource = await dbAll('select * from MergeDelete');
+  const deletesSource = await dbAll('select * from mergedelete');
   const deletes: PushJsonRequest['deletes'] = deletesSource.map((row: any) => {
-    const tableIdValue = getValueCaseInsensitive(row, 'TableId');
-    const rowIdValue = getValueCaseInsensitive(row, 'RowId');
+    const tableIdValue = row.tableid;
+    const rowIdValue = row.rowid;
     recordsDeleted.push({
-      sql: 'DELETE FROM MergeDelete WHERE TableId=? AND RowId=?',
+      sql: 'DELETE FROM mergedelete WHERE tableid=? AND rowid=?',
       args: [tableIdValue, rowIdValue],
     });
     return { table: String(tableIdValue), rowid: String(rowIdValue) };

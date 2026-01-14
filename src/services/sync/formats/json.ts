@@ -59,8 +59,7 @@ export const buildBatchQueriesFromJsonRecords = (params: {
   triggerUpdate: string;
   triggerDelete: string;
 }): QueryLike[] => {
-  const tableNameLower = params.tableName.toLowerCase();
-  const isMergeIdentity = tableNameLower === 'mergeidentity';
+  const isMergeIdentity = params.tableName === 'mergeidentity';
 
   const batchQueries: QueryLike[] = [];
 

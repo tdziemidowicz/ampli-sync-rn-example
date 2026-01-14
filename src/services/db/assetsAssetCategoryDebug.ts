@@ -73,7 +73,7 @@ export const deleteLastTestAssetCategoryRecord = async (
   const hasServerRowId = record.rowId != null;
   if (!hasServerRowId) {
     await dbExec({
-      sql: `DELETE FROM "MergeDelete" WHERE TableId = ? AND RowId IS NULL`,
+      sql: `DELETE FROM "mergedelete" WHERE tableid = ? AND rowid IS NULL`,
       args: [TABLE_NAME],
     });
   }
